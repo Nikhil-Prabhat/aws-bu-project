@@ -1,0 +1,26 @@
+version: 0.2
+phases:
+   install:
+      runtime-versions:
+         docker: 18
+   pre_build:
+      commands:
+      - echo "Entered the pre-build phase"
+      - $(aws ecr get-login  --no-include-email --region $AWS_REGION)
+   build:
+      commands:
+      - echo "Entered build phase"
+      - cd ip-treatment-service
+      - mvn compile
+      - mvn package
+      - echo " building docker image"
+      - docker build -t service/treat .
+      - docker tag service/treat 137034369116.dkr.ecr.us-west-2.amazonaws.com/treatment-registry:treat
+   post_build:
+      commands:
+      - echo "Entered the post-build phase"
+      - docker push 137034369116.dkr.ecr.us-west-2.amazonaws.com/treatment-registry:treat
+      - printf '[{"name":"treat-container","imageUri":"%s"}]' 137034369116.dkr.ecr.us-west-2.amazonaws.com/treatment-registry:treat>taskdefinition.json
+artifacts:
+   files:
+   - ip-treatment-service/taskdefinition.json
