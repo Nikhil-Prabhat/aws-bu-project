@@ -1,0 +1,26 @@
+version: 0.2
+phases:
+   install:
+      runtime-versions:
+         docker: 18
+   pre_build:
+      commands:
+      - echo "Entered the pre-build phase"
+      - $(aws ecr get-login  --no-include-email --region $AWS_REGION)
+   build:
+      commands:
+      - echo "Entered build phase"
+      - cd insuranceclaim
+      - mvn compile
+      - mvn package
+      - echo " building docker image"
+      - docker build -t service/insurance .
+      - docker tag service/insurance 137034369116.dkr.ecr.us-west-2.amazonaws.com/insurance-registry:insurance
+   post_build:
+      commands:
+      - echo "Entered the post-build phase"
+      - docker push 137034369116.dkr.ecr.us-west-2.amazonaws.com/insurance-registry:insurance
+      - printf '[{"name":"insurance-container","imageUri":"%s"}]' 137034369116.dkr.ecr.us-west-2.amazonaws.com/insurance-registry:insurance>taskdefinition.json
+artifacts:
+   files:
+   - insuranceclaim/taskdefinition.json

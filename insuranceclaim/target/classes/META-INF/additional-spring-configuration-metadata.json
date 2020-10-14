@@ -1,0 +1,34 @@
+{
+	"properties": [
+		{
+			"name": "auth.url",
+			"type": "java.lang.String",
+			"description": "A description for 'auth.url'"
+		},
+		{
+			"name": "auth.name",
+			"type": "java.lang.String",
+			"description": "A description for 'auth.name'"
+		},
+		{
+			"name": "offerings.url",
+			"type": "java.lang.String",
+			"description": "A description for 'collateral.url'"
+		},
+		{
+			"name": "offerings.name",
+			"type": "java.lang.String",
+			"description": "A description for 'collateral.name'"
+		},
+		{
+			"name": "treatment.url",
+			"type": "java.lang.String",
+			"description": "A description for 'collateral.url'"
+		},
+		{
+			"name": "treatment.name",
+			"type": "java.lang.String",
+			"description": "A description for 'collateral.name'"
+		}
+	]
+}
