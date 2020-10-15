@@ -1,0 +1,219 @@
+1. codecommit
+
+a. create repositoty : <give repository name> [ booksapp-repo] -- create
+
+now create user:
+Service --- IAM --- Users -- Add User ---give user name (test) --choose option 'programatic ' --next
+in Next window, 'attach existing policies' -- under filter policies , type 'codecommit' -- give 'AWSCodeCommitFullAccess' --next --next --- create user
+
+Now choose the created user --security credentials --under https -- generate credentials -- download it as csv 
+
+
+now in eclipse environment -- choose git perspective -- git clone -- give codecommit git repository url --give username and password --save to secure store -next --finish
+
+Now from eclipse -- choose selected files using + sign -- move to repository with some commit message -- commit and push --- now check aws codecommit repository
+
+it comes as booksapp-repo/book-service   [ books-service is the project foldername as per project name]
+
+book-service has folder structure :
+src
+pom.xml
+Dockerfile
+buildspec.yaml
+
+buildspec.yaml
+------------------
+
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      docker: 18
+  pre_build:
+    commands:
+      - echo "Entered the pre-build phase"
+      - $(aws ecr get-login  --no-include-email --region $AWS_REGION)
+  build:
+    commands:
+      - echo "Entered build phase"
+      - cd rest-service
+      - mvn compile
+      - mvn package
+      - echo " building docker image"
+      - docker build -t service/restapp .
+      - docker tag service/restapp $AWS_ACCOUNT_ID.dkr.ecr.$AWS_region.amazonaws.com/service-registry:restapp
+  post_build:
+    commands:
+    - echo "Entered the post-build phase"
+    - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_region.amazonaws.com/service-registry:restapp
+    - printf '[{"name":"restapp-container" , "imageUri": "$s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_region.amazonaws.com/service-registry:restapp > taskdefinition.json
+artifacts:
+  files:
+    - rest-service/taskdefinition.json
+
+
+Dockerfile
+-------------------------
+FROM openjdk:8-jdk-alpine
+ADD target/books-service.jar app.jar
+ENTRYPOINT ["java","-jar", "/app.jar"]
+
+
+2. create ECR (Elastic Container Registry )
+
+Service -- ECR ---get started for creating a ECR -- give name (service-registry) --create registry
+-- get the registry url -- copy and paste it somewhere for future usessss
+
+3. create ECS (elastic container service )
+service -- ECS -- cluster -- create cluster --choose powerd by AWS Fargate -- next -- give cluster name (service-cluster) --- create  -- click on 'view cluster ' 
+
+Now from left pane, click 'Task Definition' -- create new task definition -- Fargate --next
+give task definition name (booksapp-task) -- under 'task size' , give task memory (1gb) , task cpu(0.5) 
+
+Now click on 'Add Container ' -- it will give a seperate window --
+give container name (booksapp-container)
+give image (give pasted registry url + ":booksapp" )
+Under port mappings, give 8080
+click 'add' -- comes to previous window
+
+
+click on 'create ' - which create the ECS --click 'view task definition'
+
+Now from left pane, click on 'Clusters' 
+
+
+4. create load balancer
+load balance filter -- create load balancer -
+give name ---service-lb
+Avalability zones -- choose 2 different zones from given lists of zones
+then next --- next ---
+step-3 [ configure security group ] choose default security group
+step-4 [ configure routing ] -- under target group , give name (booksapp-tg) -- target type(ip) -- protocol(HTTP) -- port (80) -- next
+step-5 [ Register targets ] --- next
+next -- next -- create
+
+Now under load balancer -- scroll downwards -- get security groups --edit inbound rules
+custom tcp      tcp  8080    custom  0.0.0.0
+all tcp                      custom  default option like sg..
+http		tcp  80      custom  0.0.0.0
+
+Save rule
+
+
+5. create service under ECS
+
+now go to again ECS  ----
+Under cluster -- under service  tab-- click 'create'
+
+step-1 : configure service
+launch type : Fargate
+task-definition : booksapp-task
+cluster : service-cluster
+service name : type 'booksapp-service'
+number of tasks: 6
+minimum healthy percent :100
+maximum percent: 200
+next
+
+
+step-2: Configure network
+choose cluster vpc : default 
+subnet : choose 2 different subnets
+Click on 'edit' for Security groups --
+under 'Assigned security groups ' -- choose 'existing security group' option and check the appeared security group name from list --- save 
+
+under 'load balancer' -- choose option 'Application Load Balancer' 
+click on 'Add to load balancer'
+Container to load balance
+----
+production listener port : 80:http
+target group name : booksapp-tg
+
+
+Setp-3 : auto-scaling
+Service auto scaling :  Configure service auto scaling to adjust your service to desired count
+minimum number of task :1
+desired number of task :2
+maximum number of task :6
+
+Under automatic task scaling policies....
+scaling policy type : step scaling
+close the 'scale out' option by click on X
+now in 'scale in' option....
+Execute policy when : choose option 'create new alarm'
+alaram name: mincpu
+Alaram threshhold :'avg' of cpu unitlization '<=' 30
+for '1' consecutive periods of '5 mins'
+---Save
+
+Scaling action: Remove   1  tasks when 30 >= CPU Utilization
+-- next  ---- create  service
+after launching service -- use 'view service'
+
+
+
+
+6. create code pipe line:
+
+Services - codepipeline -- create pipe line
+step-1 : choose pipe line setting
+give pipeline name : booksapp-pipe
+--next
+Step-2 : Add source stage
+choose source provider : aws codecommit
+repository name: booksapp-repo
+branch name: master
+choose detection option : aws code pipeline
+
+Step-3 : build stage
+Build provider:aws codebuild
+choose region : default
+now click on 'create  project' which gives a seperate window
+Create build project ---
+project name :  booksapp-build
+Under environment,
+operating system : ubentu
+runtime..  : standard
+Image : choose from given drop down type 
+env type : linux
+check the option 'Previledged --enable the flag if you want to build docker image.... '
+
+click on 'additional configuration'
+Under Environment variable , give variable name
+name :  AWS_ACCOUNT_ID    value :  <cut the account id value from pasted information>
+
+under buildspec name : type book-service/build-spec.yml
+click on 'continue to pipeline'
+
+
+Now it comes to 'build stage' againn.....
+
+
+step-3:
+Add Deploy stage:
+Deploy provider : Amazon ECS
+choose name : service-cluster [ from list ]
+service name: booksapp-service [ from list]
+image definition file [otional] : book-service/taskdefinition.json
+--nnext
+before create 'code pipeline' .. give permission to amazonec2containerregistryfullaccess , sooooo
+
+
+*** Now in another window, choose IAM --- Roles --- choose our role for code build as 'codebuild-booksapp-build-service-role'
+attach policy:  amazonec2containerregistryfullaccess
+-- attach policy
+
+-- now go back code pipe line -- click on 'create pipeline'
+
+
+
+
+ 
+
+
+
+
+
+
+564790788513.dkr.ecr.us-east-1.amazonaws.com/authservice-registry
+564790788513.dkr.ecr.us-east-1.amazonaws.com/authservice-registry

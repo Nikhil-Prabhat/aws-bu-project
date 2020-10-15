@@ -1,0 +1,95 @@
+docker images  
+docker-machine ip 
+
+Go to folder :   
+cd /D/INTCDE20IJ004-workspace\DockerProjects\Lab1 
+pwd
+ls
+
+Make image file as:
+$ docker image build -t app1 .   
+$ docker images ls  
+
+
+Run container :
+$ docker container run  --name app1 -p 8081:8081 --rm app1   
+
+Check container list:
+$ docker container ls
+$ docker container stop 5d25dece0894     [ stop container]     
+$ docker container rm 5d25dece0894    [ remove container ]
+
+
+
+=========
+Create network
+$ docker network create book-mysql    
+**$ docker network create books-mysql 
+$ docker network ls      [ check network list ]
+
+
+create mysql container for database : bookdb
+$ docker container run --name bookdb --network books-mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=bookdb -d mysql:8   
+$ docker container ls  
+
+$ docker container exec -it bookdb bash    [ run the mysql container : bookdb ]
+
+mysql# mysql -uroot -proot
+show databases;
+use countrydb;
+create table country (code varchar(10) not null primary key , name varchar(10));
+insert into country values ('IN','India'),('US','United');
+select * from country;
+quit
+Ctrl+D
+
+Now make image for rest api as:
+$ docker image build -t book-jdbc .  
+$ docker images  
+$ docker container run --network book-mysql --name book-jdbc-container --rm -it -p 8082:8082 book-jdbc  
+
+docker containers
+docker container stop <container name>
+docker rm <container name>
+docker images
+docker image rm <imagename>
+
+
+==================
+
+ Catalog {  cataid int not null pk , cataname varchar(20) }
+ Products { prodid int not null pk, prodname varchar(20) , price int , cataid int (FK) }
+
+
+ Design a micro-service which has business requirements :
+a. show all products with a catagory id
+b. show all products which are under a price range
+c. show a particular product by giving a product id , if id not present handle exception
+d. Add  a new catagory with validation 
+   i. id can not be negative and it should be numeric
+  ii. catagory name should not start with other than alphabet
+ iii. id and name should not be null
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
